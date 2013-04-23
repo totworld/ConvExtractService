@@ -1,3 +1,7 @@
+import AssemblyKeys._
+
+assemblySettings
+
 name := "ConvExtractService"
 
 version := "0.0.1"

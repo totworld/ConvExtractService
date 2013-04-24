@@ -52,13 +52,19 @@ object TestClient extends App {
 
   def extractConversation(targetDirectoryPathStr : String, uid : Long, curTweet : Map[Long, Seq[Tweet]], puid : Long, opponentTweet : Map[Long, Seq[Tweet]]) {
 
-    val resultFW = new java.io.FileWriter(targetDirectoryPathStr + "/conv/" + uid + "_" + puid + ".log")
-
     val menBetweenAB = (curTweet.getOrElse(puid, List.empty) ++ opponentTweet.getOrElse(uid, List.empty)).sortBy(x=>x.date)
 
     println("--Number of Mention : " + menBetweenAB.size)
 
     if (menBetweenAB.size > 1) {
+
+      var targetConvFilePath = targetDirectoryPathStr + "/conv/" + uid + "_" + puid + ".log"
+      if (uid > puid) {
+        targetConvFilePath = targetDirectoryPathStr + "/conv/" + puid + "_" + uid + ".log"
+      }
+
+      val resultFW = new java.io.FileWriter(targetConvFilePath, true)
+
       var lastID : Long = 0L
       menBetweenAB.foreach(tweet => {
         if (lastID != tweet.pid) {
@@ -92,16 +98,16 @@ object TestClient extends App {
 
         lastID = tweet.id
       })
+      resultFW.close()
     }
 
-    resultFW.close()
   }
 
   def unzipTweetFileToSeq(filePath:String) : Seq[String] = {
     Source.fromInputStream(
       new GZIPInputStream(
         new BufferedInputStream(
-          new FileInputStream(filePath)))).getLines.toSeq
+          new FileInputStream(filePath)))).getLines().toSeq
   }
 
   def storeToPersistenceLayer(targetTweets:collection.mutable.Map[Long, Map[Long, Seq[Tweet]]], targetDirectoryPathStr : String) {
@@ -116,7 +122,7 @@ object TestClient extends App {
 
         val storeTargetFW = new ObjectOutputStream(new FileOutputStream(targetDirectoryPathStr + "/stored/" + curUID + "/" + curUID + "_" + curPUID + ".obj", true))
         storeTargetFW.writeObject(curOPTweet._2)
-        storeTargetFW.close
+        storeTargetFW.close()
       })
     })
   }
@@ -167,11 +173,13 @@ object TestClient extends App {
             if (new File(targetDirectoryPathStr + "/stored/" + puid + "/" + puid + "_0.log").exists()) {
               val inputFW = new ObjectInputStream(new FileInputStream(targetDirectoryPathStr + "/stored/" + puid + "/" + puid + "_" + uid + ".obj"))
               opponentTweet += 0L -> inputFW.readObject.asInstanceOf[Seq[Tweet]]
+              println("<< from Disk : " + puid + " - 0")
             }
 
             if (new File(targetDirectoryPathStr + "/stored/" + puid + "/" + puid + "_" + uid + ".log").exists()) {
               val inputFW = new ObjectInputStream(new FileInputStream(targetDirectoryPathStr + "/stored/" + puid + "/" + puid + "_" + uid + ".obj"))
               opponentTweet += uid -> inputFW.readObject.asInstanceOf[Seq[Tweet]]
+              println("<< from Disk : " + puid + " - " + uid)
             }
 
             println("-Opponent Target : " + puid)
@@ -180,19 +188,24 @@ object TestClient extends App {
         })
 
         if (tweets.keys.size > 100) {
-          storeToPersistenceLayer(tweets.take(10).asInstanceOf[collection.mutable.Map[Long, Map[Long, Seq[Tweet]]]], targetDirectoryPathStr)
-          tweets.take(10).foreach(x=>tweets.remove(x._1))
+          storeToPersistenceLayer(tweets.take(10), targetDirectoryPathStr)
+          tweets.take(10).foreach(x=>{
+            println(">> Stored to disk : " + x._1)
+            tweets.remove(x._1)
+          })
         }
 
         tweets += uid -> curTweet.filter(x => !processedOpponents.contains(x._1))
+
+        new File(filePath).delete()
       }
 
       processedUIDs += uid
       fw.append(uid + "\n")
-      fw.flush
+      fw.flush()
 
     })
-    storeToPersistenceLayer(tweets.asInstanceOf[collection.mutable.Map[Long, Map[Long, Seq[Tweet]]]], targetDirectoryPathStr)
+    storeToPersistenceLayer(tweets, targetDirectoryPathStr)
 
     fw.close()
   }

@@ -5,7 +5,32 @@ import java.io._
 import scala.collection.mutable
 import java.util.zip.GZIPInputStream
 import scala.Serializable
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.fasterxml.jackson.core.`type`.TypeReference
 
+object ExtendedMap {
+  implicit def String2ExtendedString(s: Map[String, Any]) = new MapGetOrElseExtension(s)
+}
+
+class MapGetOrElseExtension(s: Map[String, Any]) {
+  implicit def String2ExtendedString(s: Map[String, Any]) = new MapGetOrElseExtension(s)
+  def getOrNElse[T](targetKey:String, t:T): T  = {
+    if (s == null || s.isEmpty) {
+      t
+    } else {
+      try {
+        s.getOrElse(targetKey, t).asInstanceOf[T]
+      } catch {
+        case e :
+          Exception => t
+      }
+
+    }
+  }
+}
+
+import ExtendedMap._
 
 object TestClient extends App {
 
@@ -20,6 +45,18 @@ object TestClient extends App {
     tweets.map(x=>x.get.asInstanceOf[Map[String, Any]])
   }
 
+  def parseJsonByJackson(jsonStr : Seq[String]) : Seq[Map[String, Any]] = {
+
+    val mapper = new ObjectMapper()
+    mapper.registerModule(DefaultScalaModule)
+
+    val jsonObject = jsonStr.map(tweet => {
+      mapper.readValue[Map[String, Any]](tweet, new TypeReference[Map[String, Any]] {})
+    }).toSeq
+
+    jsonObject
+  }
+
   def getTweets(uid:Long, timeLine:Seq[Map[String, Any]]) : Map[Long, Seq[Tweet]] = {
 
     val dateFormat = new java.text.SimpleDateFormat("EEE MMM d HH:mm:ss Z yyyy", new java.util.Locale("US", "US"))
@@ -27,10 +64,10 @@ object TestClient extends App {
 
     val tweets = timeLine.map(x=>{
       new Tweet(
-        x.getOrElse("id", 0).asInstanceOf[Double].asInstanceOf[Long],
+        x.getOrNElse("id", 0L),
         uid,
-        x.getOrElse("in_reply_to_status_id", 0).asInstanceOf[Double].asInstanceOf[Long],
-        x.getOrElse("in_reply_to_user_id", 0).asInstanceOf[Double].asInstanceOf[Long],
+        x.getOrNElse("in_reply_to_status_id", 0L),
+        x.getOrNElse("in_reply_to_user_id", 0L),
         x.get("text").mkString.replaceAll("[\t\n\r]", " "),
         dateFormat.parse(x.get("created_at").mkString).getTime
       )
@@ -152,7 +189,7 @@ object TestClient extends App {
       println("Process Target : " + uid)
       if (!tweets.contains(uid)) {
 
-        val timeLine:Seq[Map[String, Any]] = parseJson(unzipTweetFileToSeq(filePath))
+        val timeLine:Seq[Map[String, Any]] = parseJsonByJackson(unzipTweetFileToSeq(filePath))
         val curTweet = getTweets(uid, timeLine)
 
         var processedOpponents : mutable.HashSet[Long] = collection.mutable.HashSet.empty
@@ -197,7 +234,7 @@ object TestClient extends App {
 
         tweets += uid -> curTweet.filter(x => !processedOpponents.contains(x._1))
 
-        new File(filePath).delete()
+//        new File(filePath).delete()
       }
 
       processedUIDs += uid

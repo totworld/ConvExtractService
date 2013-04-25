@@ -8,7 +8,7 @@ import scala.Serializable
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.core.`type`.TypeReference
-import org.slf4j.{LoggerFactory, Logger}
+import org.slf4j.LoggerFactory
 
 object ExtendedMap {
   implicit def String2ExtendedString(s: Map[String, Any]) = new MapGetOrElseExtension(s)

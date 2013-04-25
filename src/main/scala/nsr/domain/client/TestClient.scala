@@ -8,6 +8,7 @@ import scala.Serializable
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.core.`type`.TypeReference
+import org.slf4j.{LoggerFactory, Logger}
 
 object ExtendedMap {
   implicit def String2ExtendedString(s: Map[String, Any]) = new MapGetOrElseExtension(s)
@@ -32,6 +33,8 @@ class MapGetOrElseExtension(s: Map[String, Any]) {
 import ExtendedMap._
 
 object TestClient extends App {
+
+  val logger = LoggerFactory.getLogger("TestClient")
 
   case class Tweet(id:Long, uid:Long, pid:Long, puid:Long, text:String, date:Long) extends Serializable
 
@@ -90,7 +93,7 @@ object TestClient extends App {
 
     val menBetweenAB = (curTweet.getOrElse(puid, List.empty) ++ opponentTweet.getOrElse(uid, List.empty)).sortBy(x=>x.date)
 
-    println("--Number of Mention : " + menBetweenAB.size)
+    logger.info("--Number of Mention : " + menBetweenAB.size)
 
     if (menBetweenAB.size > 1) {
 
@@ -113,7 +116,7 @@ object TestClient extends App {
               resultFW.append(headTweet.uid + "\t" + headTweet.date + "\t" + headTweet.text + "\n")
             } else {
               resultFW.append(tweet.puid + "\t" + tweet.pid + "\t" + "Missing Tweet\n")
-              println("Missing Head Tweet : " + tweet.pid)
+              logger.error("Missing Head Tweet : " + tweet.pid)
             }
           } else if (tweet.puid == puid) {
             val candidateTweet = opponentTweet.getOrElse(0, List.empty).filter(x=>x.id == tweet.pid)
@@ -123,14 +126,14 @@ object TestClient extends App {
               resultFW.append(headTweet.uid + "\t" + headTweet.date + "\t" + headTweet.text + "\n")
             } else {
               resultFW.append(tweet.puid + "\t" + tweet.pid + "\t" + "Missing Tweet\n")
-              println("Missing Head Tweet : " + tweet.pid)
+              logger.error("Missing Head Tweet : " + tweet.pid)
             }
           } else
             resultFW.append(tweet.puid + "\t" + tweet.pid + "\t" + "Missing Tweet\n")
         }
         resultFW.append(tweet.uid + "\t" + tweet.date + "\t" + tweet.text + "\n")
 
-        println(tweet.text)
+        logger.info(tweet.text)
 
         lastID = tweet.id
       })
@@ -167,7 +170,7 @@ object TestClient extends App {
           storeTargetFW.close()
         })
       } else
-        println("Failed to make directory for " + curUID)
+        logger.error("Failed to make directory for " + curUID)
     })
   }
 
@@ -193,7 +196,7 @@ object TestClient extends App {
     filePaths.filter(filePath => !processedUIDs.contains(filePath.split("[/]").last.split("[.]").head.toLong)).foreach(filePath=> {
       val uid : Long = filePath.split("[/]").last.split("[.]").head.toLong
 
-      println("Process Target : " + uid)
+      logger.info("Process Target : " + uid)
       if (!processedUIDs.contains(uid)) {
 
         val timeLine:Seq[Map[String, Any]] = parseJsonByJackson(unzipTweetFileToSeq(filePath))
@@ -207,7 +210,7 @@ object TestClient extends App {
           if (tweets.contains(puid)) {
             val opponentTweet : Map[Long, Seq[Tweet]] = tweets.getOrElse(puid, Map.empty)
 
-            println("-Opponent Target : " + puid)
+            logger.info("-Opponent Target : " + puid)
             extractConversation(targetDirectoryPathStr, uid, curTweet, puid, opponentTweet)
 
             processedOpponents += puid
@@ -220,16 +223,16 @@ object TestClient extends App {
             if (new File(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_0.obj").exists()) {
               val inputFW = new ObjectInputStream(new FileInputStream(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_0.obj"))
               opponentTweet += 0L -> inputFW.readObject.asInstanceOf[Seq[Tweet]]
-              println("<< from Disk : " + puid + " - 0")
+              logger.info("<< from Disk : " + puid + " - 0")
             }
 
             if (new File(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/ " + puid + "/" + puid + "_" + uid + ".obj").exists()) {
               val inputFW = new ObjectInputStream(new FileInputStream(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_" + uid + ".obj"))
               opponentTweet += uid -> inputFW.readObject.asInstanceOf[Seq[Tweet]]
-              println("<< from Disk : " + puid + " - " + uid)
+              logger.info("<< from Disk : " + puid + " - " + uid)
             }
 
-            println("-Opponent Target : " + puid)
+            logger.info("-Opponent Target : " + puid)
             extractConversation(targetDirectoryPathStr, uid, curTweet, puid, opponentTweet)
           }
         })
@@ -237,7 +240,7 @@ object TestClient extends App {
         if (tweets.keys.size > 100) {
           storeToPersistenceLayer(tweets.take(10), targetDirectoryPathStr)
           tweets.take(10).foreach(x=>{
-            println(">> Stored to disk : " + x._1)
+            logger.info(">> Stored to disk : " + x._1)
             tweets.remove(x._1)
           })
         }

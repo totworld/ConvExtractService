@@ -15,17 +15,16 @@ object ExtendedMap {
 
 class MapGetOrElseExtension(s: Map[String, Any]) {
   implicit def String2ExtendedString(s: Map[String, Any]) = new MapGetOrElseExtension(s)
-  def getOrNElse[T](targetKey:String, t:T): T  = {
+  def getOrNElse[Long](targetKey : String, t : Long) : Long  = {
     if (s == null || s.isEmpty) {
       t
     } else {
-      try {
-        s.getOrElse(targetKey, t).asInstanceOf[T]
-      } catch {
-        case e :
+      try
+        s.getOrElse(targetKey, t).toString.toLong.asInstanceOf[Long]
+      catch {
+        case e:
           Exception => t
       }
-
     }
   }
 }
@@ -150,17 +149,25 @@ object TestClient extends App {
   def storeToPersistenceLayer(targetTweets:collection.mutable.Map[Long, Map[Long, Seq[Tweet]]], targetDirectoryPathStr : String) {
     targetTweets.foreach(curTweets => {
       val curUID = curTweets._1
-      curTweets._2.foreach(curOPTweet => {
-        val curPUID = curOPTweet._1
 
-        val targetDirFW = new File(targetDirectoryPathStr + "/stored/" + curUID + "/")
-        if (!targetDirFW.exists())
-          targetDirFW.mkdir()
+      val idx = curUID % 10
+      val idx2 = curUID / 10 % 10
 
-        val storeTargetFW = new ObjectOutputStream(new FileOutputStream(targetDirectoryPathStr + "/stored/" + curUID + "/" + curUID + "_" + curPUID + ".obj", true))
-        storeTargetFW.writeObject(curOPTweet._2)
-        storeTargetFW.close()
-      })
+      val targetDirFW = new File(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/" + curUID)
+
+      var isTargetDirExist = targetDirFW.exists()
+      if (!isTargetDirExist)
+        isTargetDirExist = targetDirFW.mkdir()
+
+      if (isTargetDirExist) {
+        curTweets._2.foreach(curOPTweet => {
+          val curPUID = curOPTweet._1
+          val storeTargetFW = new ObjectOutputStream(new FileOutputStream(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/" + curUID + "/" + curUID + "_" + curPUID + ".obj", true))
+          storeTargetFW.writeObject(curOPTweet._2)
+          storeTargetFW.close()
+        })
+      } else
+        println("Failed to make directory for " + curUID)
     })
   }
 
@@ -187,7 +194,7 @@ object TestClient extends App {
       val uid : Long = filePath.split("[/]").last.split("[.]").head.toLong
 
       println("Process Target : " + uid)
-      if (!tweets.contains(uid)) {
+      if (!processedUIDs.contains(uid)) {
 
         val timeLine:Seq[Map[String, Any]] = parseJsonByJackson(unzipTweetFileToSeq(filePath))
         val curTweet = getTweets(uid, timeLine)
@@ -207,14 +214,17 @@ object TestClient extends App {
           } else if (processedUIDs.contains(puid)) {
             var opponentTweet: Map[Long, Seq[Tweet]] = Map.empty
 
-            if (new File(targetDirectoryPathStr + "/stored/" + puid + "/" + puid + "_0.log").exists()) {
-              val inputFW = new ObjectInputStream(new FileInputStream(targetDirectoryPathStr + "/stored/" + puid + "/" + puid + "_" + uid + ".obj"))
+            val idx = puid % 10
+            val idx2 = puid / 10 % 10
+
+            if (new File(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_0.obj").exists()) {
+              val inputFW = new ObjectInputStream(new FileInputStream(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_0.obj"))
               opponentTweet += 0L -> inputFW.readObject.asInstanceOf[Seq[Tweet]]
               println("<< from Disk : " + puid + " - 0")
             }
 
-            if (new File(targetDirectoryPathStr + "/stored/" + puid + "/" + puid + "_" + uid + ".log").exists()) {
-              val inputFW = new ObjectInputStream(new FileInputStream(targetDirectoryPathStr + "/stored/" + puid + "/" + puid + "_" + uid + ".obj"))
+            if (new File(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/ " + puid + "/" + puid + "_" + uid + ".obj").exists()) {
+              val inputFW = new ObjectInputStream(new FileInputStream(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_" + uid + ".obj"))
               opponentTweet += uid -> inputFW.readObject.asInstanceOf[Seq[Tweet]]
               println("<< from Disk : " + puid + " - " + uid)
             }
@@ -234,12 +244,12 @@ object TestClient extends App {
 
         tweets += uid -> curTweet.filter(x => !processedOpponents.contains(x._1))
 
-//        new File(filePath).delete()
-      }
+        new File(filePath).delete()
 
-      processedUIDs += uid
-      fw.append(uid + "\n")
-      fw.flush()
+        processedUIDs += uid
+        fw.append(uid + "\n")
+        fw.flush()
+      }
 
     })
     storeToPersistenceLayer(tweets, targetDirectoryPathStr)

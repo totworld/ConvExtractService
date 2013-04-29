@@ -4,11 +4,11 @@ import scala.io.Source
 import java.io._
 import scala.collection.mutable
 import java.util.zip.GZIPInputStream
-import scala.Serializable
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.core.`type`.TypeReference
 import org.slf4j.LoggerFactory
+import nsr.domain.model.Tweet
 
 object ExtendedMap {
   implicit def String2ExtendedString(s: Map[String, Any]) = new MapGetOrElseExtension(s)
@@ -32,13 +32,11 @@ class MapGetOrElseExtension(s: Map[String, Any]) {
 
 import ExtendedMap._
 
-object TestClient extends App {
+object clientProcess {
+  private[this] val logger = LoggerFactory.getLogger("nsr.domain.client.TestClient")
 
-  val logger = LoggerFactory.getLogger("TestClient")
 
-  case class Tweet(id:Long, uid:Long, pid:Long, puid:Long, text:String, date:Long) extends Serializable
-
-  def parseJson(jsonStr : Seq[String]) : Seq[Map[String, Any]] = {
+  def parseJson(jsonStr : Seq[String]) = {
 
     val tweets = jsonStr.map(tweet => {
       scala.util.parsing.json.JSON.parseFull(tweet)
@@ -59,23 +57,41 @@ object TestClient extends App {
     jsonObject
   }
 
+  def isValidJson(target: Map[String, Any]): Boolean = {
+
+    var result = false
+
+    if (target.contains("id")
+          && target.contains("text")
+          && target.contains("created_at")
+          && target.get("created_at").mkString.length > 20)
+      result = true
+    else
+      logger.warn("[getTweets]Mandatory Field is missing.")
+
+    result
+  }
+
   def getTweets(uid:Long, timeLine:Seq[Map[String, Any]]) : Map[Long, Seq[Tweet]] = {
 
     val dateFormat = new java.text.SimpleDateFormat("EEE MMM d HH:mm:ss Z yyyy", new java.util.Locale("US", "US"))
     dateFormat.format(new java.util.Date())
 
     val tweets = timeLine.map(x=>{
-      new Tweet(
-        x.getOrNElse("id", 0L),
-        uid,
-        x.getOrNElse("in_reply_to_status_id", 0L),
-        x.getOrNElse("in_reply_to_user_id", 0L),
-        x.get("text").mkString.replaceAll("[\t\n\r]", " "),
-        dateFormat.parse(x.get("created_at").mkString).getTime
-      )
+      if (isValidJson(x)) {
+          new Tweet(
+            x.getOrNElse("id", 0L),
+            uid,
+            x.getOrNElse("in_reply_to_status_id", 0L),
+            x.getOrNElse("in_reply_to_user_id", 0L),
+            x.get("text").mkString.replaceAll("[\t\n\r]", " "),
+            dateFormat.parse(x.get("created_at").mkString).getTime
+          )
+      } else
+        new Tweet(0L, 0L, 0L, 0L, "", 0L)
     })
 
-    val tweetsByPUID:Map[Long, Seq[Tweet]] = tweets.groupBy(x => x.puid)
+    val tweetsByPUID:Map[Long, Seq[Tweet]] = tweets.filter(x=>x.id != 0L).groupBy(x => x.puid)
 
     tweetsByPUID
   }
@@ -139,7 +155,6 @@ object TestClient extends App {
       })
       resultFW.close()
     }
-
   }
 
   def unzipTweetFileToSeq(filePath:String) : Seq[String] = {
@@ -174,7 +189,7 @@ object TestClient extends App {
     })
   }
 
-  override def main(args: Array[String]) {
+  def process(args: Array[String]) {
 
     val targetDirectoryPathStr = args.head
 
@@ -220,14 +235,13 @@ object TestClient extends App {
             val idx = puid % 10
             val idx2 = puid / 10 % 10
 
-            if (new File(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_0.obj").exists()) {
-              val inputFW = new ObjectInputStream(new FileInputStream(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_0.obj"))
+            if (new File(targetDirectoryPathStr + ("/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_0.obj").replaceAll("[ ]", "")).exists()) {
+              val inputFW = new ObjectInputStream(new FileInputStream(targetDirectoryPathStr + ("/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_0.obj").replaceAll("[ ]", "")))
               opponentTweet += 0L -> inputFW.readObject.asInstanceOf[Seq[Tweet]]
               logger.info("<< from Disk : " + puid + " - 0")
             }
-
-            if (new File(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/ " + puid + "/" + puid + "_" + uid + ".obj").exists()) {
-              val inputFW = new ObjectInputStream(new FileInputStream(targetDirectoryPathStr + "/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_" + uid + ".obj"))
+            if (new File(targetDirectoryPathStr + "/stored/" + (idx + "/" + idx2 + "/ " + puid + "/" + puid + "_" + uid + ".obj").replaceAll("[ ]", "")).exists()) {
+              val inputFW = new ObjectInputStream(new FileInputStream(targetDirectoryPathStr + ("/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_" + uid + ".obj").replaceAll("[ ]", "")))
               opponentTweet += uid -> inputFW.readObject.asInstanceOf[Seq[Tweet]]
               logger.info("<< from Disk : " + puid + " - " + uid)
             }
@@ -247,7 +261,7 @@ object TestClient extends App {
 
         tweets += uid -> curTweet.filter(x => !processedOpponents.contains(x._1))
 
-        new File(filePath).delete()
+//      new File(filePath).delete()
 
         processedUIDs += uid
         fw.append(uid + "\n")
@@ -259,4 +273,12 @@ object TestClient extends App {
 
     fw.close()
   }
+}
+
+object TestClient extends App {
+
+  override def main(args:Array[String]) {
+    clientProcess.process(args)
+  }
+
 }

@@ -125,7 +125,9 @@ object clientProcess {
         if (lastID != tweet.pid) {
           resultFW.append("\n")
           if (tweet.puid == uid) {
-            val candidateTweet = curTweet.getOrElse(0, List.empty).filter(x=>x.id == tweet.pid)
+            val candidateTweet = curTweet.map(y=> {
+              y._2.filter(x=>x.id == tweet.pid)
+            }).flatten
 
             if (!candidateTweet.isEmpty) {
               val headTweet = candidateTweet.head
@@ -135,7 +137,10 @@ object clientProcess {
               logger.error("Missing Head Tweet : " + tweet.pid)
             }
           } else if (tweet.puid == puid) {
-            val candidateTweet = opponentTweet.getOrElse(0, List.empty).filter(x=>x.id == tweet.pid)
+
+            val candidateTweet = opponentTweet.map(y=> {
+              y._2.filter(x=>x.id == tweet.pid)
+            }).flatten
 
             if (!candidateTweet.isEmpty) {
               val headTweet = candidateTweet.head

@@ -271,10 +271,16 @@ object clientProcess {
 
 //      new File(filePath).delete()
 
-        val conf = new Configuration()
-        val fs = FileSystem.get(conf)
-        if (fs.isFile(new Path("/user/kanghak/e_twitter/data/raw/" + filePath.split("[/]").last)) == false) {
-          fs.copyFromLocalFile(new Path(filePath), new Path("/user/kanghak/e_twitter/data/raw/" + filePath.split("[/]").last))
+        try {
+          val conf = new Configuration()
+          val fs = FileSystem.get(conf)
+          if (fs.isFile(new Path("/user/kanghak/e_twitter/data/raw/" + filePath.split("[/]").last)) == false) {
+            fs.copyFromLocalFile(new Path(filePath), new Path("/user/kanghak/e_twitter/data/raw/" + filePath.split("[/]").last))
+            logger.info("Hadoop File Copy for " + filePath.split("[/]").last)
+          }
+        } catch {
+          case e:
+            Exception => logger.error("Hadoop File Copy is Failed.")
         }
 
 

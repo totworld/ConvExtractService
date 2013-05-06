@@ -9,6 +9,8 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.core.`type`.TypeReference
 import org.slf4j.LoggerFactory
 import nsr.domain.model.Tweet
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{Path, FileSystem}
 
 object ExtendedMap {
   implicit def String2ExtendedString(s: Map[String, Any]) = new MapGetOrElseExtension(s)
@@ -240,6 +242,7 @@ object clientProcess {
             val idx = puid % 10
             val idx2 = puid / 10 % 10
 
+            //TODO : Change to read from every opponent
             if (new File(targetDirectoryPathStr + ("/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_0.obj").replaceAll("[ ]", "")).exists()) {
               val inputFW = new ObjectInputStream(new FileInputStream(targetDirectoryPathStr + ("/stored/" + idx + "/" + idx2 + "/" + puid + "/" + puid + "_0.obj").replaceAll("[ ]", "")))
               opponentTweet += 0L -> inputFW.readObject.asInstanceOf[Seq[Tweet]]
@@ -267,6 +270,13 @@ object clientProcess {
         tweets += uid -> curTweet.filter(x => !processedOpponents.contains(x._1))
 
 //      new File(filePath).delete()
+
+        val conf = new Configuration()
+        val fs = FileSystem.get(conf)
+        if (fs.isFile(new Path("/user/kanghak/e_twitter/data/raw/" + filePath.split("[/]").last)) == false) {
+          fs.copyFromLocalFile(new Path(filePath), new Path("/user/kanghak/e_twitter/data/raw/" + filePath.split("[/]").last))
+        }
+
 
         processedUIDs += uid
         fw.append(uid + "\n")

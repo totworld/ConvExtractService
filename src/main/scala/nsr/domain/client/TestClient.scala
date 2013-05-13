@@ -9,8 +9,8 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.core.`type`.TypeReference
 import org.slf4j.LoggerFactory
 import nsr.domain.model.Tweet
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{Path, FileSystem}
+//import org.apache.hadoop.conf.Configuration
+//import org.apache.hadoop.fs.{Path, FileSystem}
 
 object ExtendedMap {
   implicit def String2ExtendedString(s: Map[String, Any]) = new MapGetOrElseExtension(s)
@@ -101,7 +101,7 @@ object clientProcess {
   def getTargetPaths(dirPath : String) : List[String] = {
     val dirFile = new File(dirPath)
 
-    if (dirFile == null && !dirFile.isDirectory)
+      if (dirFile == null && !dirFile.isDirectory)
       List.empty
 
     dirFile.listFiles().map(x=>x.getAbsolutePath).filter(x=>x.endsWith(".tweets.gz")).toList
@@ -271,17 +271,17 @@ object clientProcess {
 
 //      new File(filePath).delete()
 
-        try {
-          val conf = new Configuration()
-          val fs = FileSystem.get(conf)
-          if (fs.isFile(new Path("/user/kanghak/e_twitter/data/raw/" + filePath.split("[/]").last)) == false) {
-            fs.copyFromLocalFile(new Path(filePath), new Path("/user/kanghak/e_twitter/data/raw/" + filePath.split("[/]").last))
-            logger.info("Hadoop File Copy for " + filePath.split("[/]").last)
-          }
-        } catch {
-          case e:
-            Exception => logger.error("Hadoop File Copy is Failed.")
-        }
+//        try {
+//          val conf = new Configuration()
+//          val fs = FileSystem.get(conf)
+//          if (fs.isFile(new Path("/user/kanghak/e_twitter/data/raw/" + filePath.split("[/]").last)) == false) {
+//            fs.copyFromLocalFile(new Path(filePath), new Path("/user/kanghak/e_twitter/data/raw/" + filePath.split("[/]").last))
+//            logger.info("Hadoop File Copy for " + filePath.split("[/]").last)
+//          }
+//        } catch {
+//          case e:
+//            Exception => logger.error("Hadoop File Copy is Failed.")
+//        }
 
 
         processedUIDs += uid
